@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Cetak Struk Bensin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: #f9f9f9;
+      padding: 24px;
+    }
+    .container {
+      background: #fff;
+      max-width: 340px;
+      margin: auto;
+      padding: 18px 12px 24px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      font-size: 15px;
+    }
+    h2 {
+      text-align: center;
+      font-size: 17px;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+    label {
+      font-size: 14px;
+      margin-top: 9px;
+      display: block;
+      font-weight: bold;
+    }
+    input, select, textarea {
+      width: 100%;
+      font-family: 'Courier New', Courier, monospace;
+      padding: 7px;
+      margin-top: 3px;
+      font-size: 15px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      box-sizing: border-box;
+      background: #f5f5f5;
+    }
+    button {
+      margin-top: 18px;
+      width: 100%;
+      padding: 10px;
+      background: #323232;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #444;
+    }
+    .barcode-preview {
+      margin: 13px auto 0 auto;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Input Struk Bensin</h2>
+    <form id="strukForm" autocomplete="off">
+      <label for="spbu">SPBU & No:</label>
+      <input type="text" id="spbu" required placeholder="Contoh: SPBU 34-11806">
+
+      <label for="alamat">Alamat:</label>
+      <textarea id="alamat" rows="2" required placeholder="Contoh: Jl. Satu Maret&#10;Kalideres - Jakarta Barat"></textarea>
+
+      <label for="telp">Telp:</label>
+      <input type="text" id="telp" required placeholder="Contoh: 021-54368076">
+
+      <label for="pin">PIN:</label>
+      <input type="text" id="pin" maxlength="14" pattern="[0-9]+" required placeholder="Hanya angka">
+
+      <div class="barcode-preview">
+        <svg id="barcode"></svg>
+      </div>
+
+      <label for="tanggal">Tanggal & Jam:</label>
+      <input type="datetime-local" id="tanggal" required>
+
+      <label for="nominal">Nominal (Rp):</label>
+      <input type="number" id="nominal" required placeholder="Contoh: 20000" min="1">
+
+      <label for="produk">Produk:</label>
+      <select id="produk" required>
+        <option value="">-- Pilih Produk --</option>
+        <option value="Pertalite">Pertalite</option>
+        <option value="Pertamax">Pertamax</option>
+        <option value="Solar">Solar</option>
+        <option value="Dexlite">Dexlite</option>
+      </select>
+
+      <label for="harga">Harga (Rp):</label>
+      <input type="number" id="harga" required placeholder="Contoh: 10000" min="1">
+
+      <label for="volume">Volume (L):</label>
+      <input type="number" id="volume" required placeholder="Contoh: 2.00" step="0.01" min="0.01">
+
+      <label for="petugas">Petugas:</label>
+      <input type="text" id="petugas" required placeholder="Contoh: HERLAN">
+
+      <button type="button" onclick="cetakPDF()">Cetak PDF</button>
+    </form>
+  </div>
+
+  <!-- jsPDF CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- JsBarcode CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <script>
+    // Barcode sesuai PIN, hanya angka
+    function updateBarcode() {
+      const pin = document.getElementById("pin").value.replace(/\D/g, '');
+      JsBarcode("#barcode", pin, {
+        format: "CODE128",
+        width: 2,
+        height: 36,
+        displayValue: true,
+        fontSize: 15,
+        margin: 0
+      });
+      window.currentBarcode = pin;
+    }
+    document.getElementById("pin").addEventListener("input", updateBarcode);
+    // Inisialisasi barcode kosong
+    JsBarcode("#barcode", "", {
+      format: "CODE128",
+      width: 2,
+      height: 36,
+      displayValue: true,
+      fontSize: 15,
+      margin: 0
+    });
+
+    function cetakPDF() {
+      const { jsPDF } = window.jspdf;
+      const spbu = document.getElementById('spbu').value.trim();
+      const alamat = document.getElementById('alamat').value.trim();
+      const telp = document.getElementById('telp').value.trim();
+      const pin = document.getElementById('pin').value.replace(/\D/g, '');
+      const tanggalRaw = document.getElementById('tanggal').value;
+      const nominal = parseInt(document.getElementById('nominal').value);
+      const produk = document.getElementById('produk').value;
+      const harga = parseInt(document.getElementById('harga').value);
+      const volume = parseFloat(document.getElementById('volume').value);
+      const petugas = document.getElementById('petugas').value.trim();
+
+      if (!spbu || !alamat || !telp || !pin || !tanggalRaw || !nominal || !produk || !harga || !volume || !petugas) {
+        alert('Mohon lengkapi semua data!');
+        return;
+      }
+
+      // Format tanggal & jam
+      const tglObj = new Date(tanggalRaw);
+      const hari = String(tglObj.getDate()).padStart(2, '0');
+      const bulan = tglObj.toLocaleString('id-ID', { month: 'short' });
+      const tahun = tglObj.getFullYear();
+      const jam = String(tglObj.getHours()).padStart(2, '0') + ':' + String(tglObj.getMinutes()).padStart(2, '0') + ':' + String(tglObj.getSeconds()).padStart(2, '0');
+      const tanggalCetak = `${hari} ${bulan} ${tahun}, ${jam}`;
+
+      function toRupiah(angka) {
+        return angka.toLocaleString('id-ID');
+      }
+
+      // PDF
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [80,120]
+      });
+
+      let y = 12;
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(12);
+      doc.text(spbu, 8, y); y += 6;
+      doc.setFontSize(11);
+      const alamatLines = doc.splitTextToSize(alamat, 64);
+      alamatLines.forEach(line => { doc.text(line, 8, y); y += 5; });
+      doc.text("TELP." + telp, 8, y); y += 7;
+      doc.line(8, y, 72, y); y += 5;
+
+      doc.setFontSize(11);
+      doc.text("PIN....." + pin, 8, y); y += 6;
+      doc.text("Tanggal." + tanggalCetak, 8, y); y += 6;
+      doc.text("Nominal." + toRupiah(nominal), 8, y); y += 6;
+      doc.text("Produk.." + produk, 8, y); y += 6;
+      doc.text("Harga..." + toRupiah(harga), 8, y); y += 6;
+      doc.text("Volume.." + volume.toFixed(2) + "L", 8, y); y += 6;
+      doc.text("Petugas." + petugas.toUpperCase(), 8, y); y += 6;
+
+      // Barcode
+      try {
+        const svg = document.getElementById('barcode');
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svg);
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new window.Image();
+        img.onload = function() {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const pngData = canvas.toDataURL('image/png');
+          doc.addImage(pngData, 'PNG', 8, y, 56, 16);
+          doc.text(pin, 8, y + 17);
+          doc.save('struk-bensin.pdf');
+        };
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
+      } catch(e) {
+        // Jika gagal barcode, tetap cetak struk
+        doc.text(pin, 8, y + 17);
+        doc.save('struk-bensin.pdf');
+      }
+    }
+  </script>
+</body>
+</html>
